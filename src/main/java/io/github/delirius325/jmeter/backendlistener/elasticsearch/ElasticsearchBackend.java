@@ -9,6 +9,7 @@ import java.util.*;
 
 import com.google.gson.Gson;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.text.StrBuilder;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpStatus;
@@ -40,6 +41,7 @@ public class ElasticsearchBackend extends AbstractBackendListenerClient {
     private static final String ES_TRANSPORT_CLIENT = "es.transport.client";
     private static final long DEFAULT_TIMEOUT_MS = 200L;
     private static final Logger logger = LoggerFactory.getLogger(ElasticsearchBackend.class);
+    private static final DateTimeFormatter IDX_FORMAT = DateTimeFormatter.ofPattern("yyyy.MM.dd", Locale.US);
 
     private List<String> bulkRequestList;
     private List<String> filters;
@@ -64,6 +66,13 @@ public class ElasticsearchBackend extends AbstractBackendListenerClient {
         return parameters;
     }
 
+    private String genSuffixIdx(String str) {
+    	return new StringBuilder(str)
+    	.append("-")
+    	.append( LocalDateTime.now().format(IDX_FORMAT))
+    	.toString();
+    }
+    
     @Override
     public void setupTest(BackendListenerContext context) throws Exception {
         try {
@@ -72,7 +81,7 @@ public class ElasticsearchBackend extends AbstractBackendListenerClient {
             
             this.filters         = new LinkedList<String>();
             this.bulkRequestList = new LinkedList<String>();
-            this.index           = context.getParameter(ES_INDEX).toLowerCase();
+            this.index           = genSuffixIdx(context.getParameter(ES_INDEX).toLowerCase() );
             this.bulkSize        = Integer.parseInt(context.getParameter(ES_BULK_SIZE));
             this.timeoutMs       = JMeterUtils.getPropDefault(ES_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
             this.buildNumber     = (JMeterUtils.getProperty(ElasticsearchBackend.BUILD_NUMBER) != null && JMeterUtils.getProperty(ElasticsearchBackend.BUILD_NUMBER).trim() != "") ? Integer.parseInt(JMeterUtils.getProperty(ElasticsearchBackend.BUILD_NUMBER)) : 0;
@@ -94,11 +103,12 @@ public class ElasticsearchBackend extends AbstractBackendListenerClient {
                     this.filters.add(filter);
                 }
             }
-
+           
             try {
+            	 logger.info("create index {} ", this.index); 
                 this.client.performRequest("PUT", "/"+ this.index);
             } catch(Exception e) {
-                logger.info("Index already exists!");
+                logger.info("Index already exists!, {}", this.index); 
             }
 
             super.setupTest(context);
